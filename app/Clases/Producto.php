@@ -4,30 +4,33 @@ use Illuminate\Support\Arr;
 use JetBrains\PhpStorm\ArrayShape;
 use Producto as GlobalProducto;
 
-    include "Entidad.php";
-    include_once "ManejoDB.php";
+include_once "ManejoDB.php";
+include_once "Puesto.php";
 
+    class Producto{
 
-    class Producto extends Entidad{
-
-        public $id;
         public $nombre;
-        public $tipo;
+        public $id_puesto;
+        public $id_producto;
         public $activo;
+        public $precio;
 
-        function __construct($nombre = null, $tipo = null, $id = null, $activo = null)
+        function __construct($nombre = null, $id_puesto = null, $id_producto = null, $activo = null, $precio = null)
         {
             if( $nombre != null ){
                 $this->nombre = $nombre;
             }
-            if( $tipo != null ){
-                $this->tipo = $tipo;
+            if( $id_puesto != null ){
+                $this->id_puesto = $id_puesto;
             }
-            if( $id != null ) {
-                $this->id = $id;
+            if( $id_producto != null ) {
+                $this->id_producto = $id_producto;
             } 
             if( $activo != null ) {
                 $this->activo = $activo;
+            }
+            if( $precio != null ){
+                $this->precio = $precio;
             }
         }
 
@@ -42,25 +45,78 @@ use Producto as GlobalProducto;
                 echo $e->getMessage();
             }
         }
-        
-        static function Alta( $producto ){
+
+        static function ObtenerListadoPorPopularidad( $ascendente ){
             try{
-                if( $producto instanceof Producto ){
-                    if( self::Existe( $producto ) ) {
-                        return false;
-                    } else {
-                        $objetoPdo = ManejoDB::CrearAcceso();
-                        $consulta = $objetoPdo->RetornarConsulta( 'INSERT INTO productos (nombre, tipo) VALUES (:nombre, :tipo)' );
-                        $consulta->bindParam( ':nombre', $producto->nombre, PDO::PARAM_STR_CHAR );
-                        $consulta->bindParam( ':tipo', $producto->tipo, PDO::PARAM_STR_CHAR );
-                        $consulta->execute();
-                        return $producto;
-                    }
-                }
+                $orden = "DESC";
+                if( $ascendente )
+                    $orden = "ASC";
+                $objetoPdo = ManejoDB::CrearAcceso();
+                $query = "SELECT productos.id_producto, productos.nombre, COUNT(*) AS cantidad_vendido 
+                FROM (productos JOIN pedidos ON productos.nombre = pedidos.encargo) 
+                GROUP BY productos.id_producto 
+                ORDER BY cantidad_vendido ".$orden.
+                " WHERE `logs`.`fecha_accion` > :fecha_desde ".
+                "AND `logs`.`fecha_accion` <= :fecha_hasta";
+                
+                $consulta = $objetoPdo->RetornarConsulta( $query );
+                $consulta->execute();
+                $arrayReturn = $consulta->fetchAll( PDO::FETCH_OBJ );
+                return $arrayReturn;
             }catch(Exception $e){
                 echo $e->getMessage();
             }
         }
+        
+        static function IDPuestoQCorresponde( $nombreProducto ){
+            try{
+                $idPuesto = 0;
+                $objetoPdo = ManejoDB::CrearAcceso();
+                $consulta = $objetoPdo->RetornarConsulta( "SELECT puestos.id_puesto FROM `productos` INNER JOIN puestos
+                 ON productos.id_puesto = puestos.id_puesto WHERE productos.nombre = '".$nombreProducto."'" );
+                $consulta->bindColumn( "id_puesto", $idPuesto);
+                $consulta->execute();
+                $consulta->fetch( PDO::FETCH_BOUND );
+                return $idPuesto;
+            }catch(Exception $e){
+                echo $e->getMessage();
+            }
+        }
+
+        static function Alta( $producto ){
+            try{
+                // $nId = self::UltimoId()+1;
+                // $nProducto = new self( $nombre, $id_puesto, $nId, true, $precio);
+                $objetoPdo = ManejoDB::CrearAcceso();
+                $consulta = $objetoPdo->RetornarConsulta( 'INSERT INTO productos (id_producto, nombre, id_puesto, precio, activo) VALUES (:idProducto, :nombre, :puestoAsignado, :precio, :activo)' );
+                $consulta->bindValue( ':idProducto', $producto->id_producto );
+                $consulta->bindParam( ':nombre', $producto->nombre );
+                $consulta->bindParam( ':puestoAsignado', $producto->id_puesto );
+                $consulta->bindValue( ':precio', $producto->precio );
+                $consulta->bindValue( ':activo', $producto->activo );
+                $consulta->execute();
+                // return $nProducto;
+            }catch(Exception $e){
+                echo $e->getMessage();
+            }
+        }
+
+        // static function Alta( $nombre, $id_puesto, $precio ){
+        //     try{
+        //         $nId = self::UltimoId()+1;
+        //         $nProducto = new self( $nombre, $id_puesto, $nId, true, $precio);
+        //         $objetoPdo = ManejoDB::CrearAcceso();
+        //         $consulta = $objetoPdo->RetornarConsulta( 'INSERT INTO productos (id_producto, nombre, id_puesto, precio) VALUES (:idProducto, :nombre, :puestoAsignado, :precio)' );
+        //         $consulta->bindValue( ':idProducto', $nId );
+        //         $consulta->bindParam( ':nombre', $nombre );
+        //         $consulta->bindParam( ':puestoAsignado', $id_puesto );
+        //         $consulta->bindValue( ':precio', $precio );
+        //         $consulta->execute();
+        //         return $nProducto;
+        //     }catch(Exception $e){
+        //         echo $e->getMessage();
+        //     }
+        // }
 
         static function Baja( $producto )
         {
@@ -92,11 +148,25 @@ use Producto as GlobalProducto;
             }
         }
 
+        public static function UltimoId( ){
+            try{
+                $ultimoNumero = 0;
+                $objetoPdo = ManejoDB::CrearAcceso();
+                $consulta = $objetoPdo->RetornarConsulta( 'SELECT id_producto FROM productos ORDER BY id_producto DESC LIMIT 1' );
+                $consulta->bindColumn('id_producto', $ultimoNumero );
+                $consulta->execute();
+                $consulta->fetch(PDO::FETCH_BOUND);
+                return $ultimoNumero;
+            }catch( Exception $e){
+                echo $e->getMessage();
+            }
+        }
+
         static function Existe( $producto ) {
             try{
                 $objetoPdo = ManejoDB::CrearAcceso();
                 $consulta = $objetoPdo->RetornarConsulta( "SELECT activo FROM productos WHERE nombre = :nombre" );
-                $consulta->bindParam( ':nombre', $producto->nombre );
+                $consulta->bindParam( ':nombre', $producto );
                 $consulta->execute();
                 $resultado = $consulta->fetch();
                 if( empty( $resultado ) ) {
@@ -109,9 +179,22 @@ use Producto as GlobalProducto;
             }
         }
 
+        static function ObtenerPorNombre( $nombre ){
+            try{
+                $objetoPdo = ManejoDB::CrearAcceso();
+                $consulta = $objetoPdo->RetornarConsulta( 'SELECT * FROM productos WHERE nombre = :nombre' );
+                $consulta->bindValue( ":nombre", $nombre);
+                $consulta->setFetchMode(PDO::FETCH_CLASS, 'Producto');
+                $consulta->execute();
+                return $consulta->fetch();
+            }catch(Exception $e){
+                echo $e->getMessage();
+            }
+        }
+
         function __toString()
         {
-            return "[" . $this->id . "] " . $this->nombre . ". Tipo: " . $this->tipo . "\n";
+            return "[" . sprintf("%03d" ,$this->id_producto) . "] " . str_pad( $this->nombre, 20, "." ) . " $". number_format( $this->precio, 2 ).". Puesto: :[" . Puesto::ObtenerNombreDePuestoID($this->id_puesto) . "]:\n";
         }
     }
 

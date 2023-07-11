@@ -1,7 +1,9 @@
 <?php
 
-require_once "../../vendor/autoload.php";
+require_once '..\vendor\autoload.php';
 use Firebase\JWT\JWT;
+date_default_timezone_set('America/Argentina/Buenos_Aires');
+
 
 class AutenticadorJWT {
 
@@ -10,12 +12,13 @@ class AutenticadorJWT {
 
     public static function CrearToken( $datos ) {
         $ahora = time();
+        $expiracion = strtotime("+1day");
 
         // PARAMETROS DEL PAYLOAD
         // https://auth0.com/docs/secure/tokens/json-web-tokens/json-web-token-claims   
         $payload = [
             'iat' => $ahora,           // CUANDO SE CREO EL TOKEN (OPCIONAL)
-            'exp' => $ahora + (30),    // EL TIEMPO DE VENCIMIENTO DEL TOKEN (OPCIONAL)
+            'exp' => $expiracion,    // EL TIEMPO DE VENCIMIENTO DEL TOKEN (OPCIONAL)
             //'aud' => self::Aud(),      // PARA QUIEN ES EL TOKEN
             'data' => $datos,          // DATOS DEL JWT
             'app' => 'JWT API REST'    // INFO DE LA APLICACION

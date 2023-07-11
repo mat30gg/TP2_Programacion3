@@ -14,7 +14,7 @@ class Mesa{
     public $codigoMesa;
     public $fotoMesa;
 
-    public function __construct( $estado = null, $fotoMesa = null, $codigoMesa = null)
+    public function __construct( $estado = null, $codigoMesa = null, $fotoMesa = null)
     {
         if( $estado != null ){
             $this->estado = $estado;
@@ -41,8 +41,9 @@ class Mesa{
     
     public static function Alta( $fotoMesa = null ){
         try{
-            $codigoMesaMesa = Mesa::UltimocodigoMesa()+1;
-            $mesa = new Mesa( Mesa::CLIENTE_ESPERANDO, $fotoMesa, $codigoMesaMesa );
+            $codigoMesa = Mesa::UltimocodigoMesa()+1;
+            $mesa = new Mesa( Mesa::CLIENTE_ESPERANDO, $codigoMesa );
+            $mesa->AgregarFoto( $fotoMesa );
             $objetoPdo = ManejoDB::CrearAcceso();
             $consulta = $objetoPdo->RetornarConsulta( 'INSERT INTO mesas (codigoMesa, estado, fotoMesa) VALUES (:codigoMesa, :estado, :fotoMesa)' );
             $consulta->bindValue( ':estado', $mesa->estado );
@@ -59,8 +60,9 @@ class Mesa{
         try{
             if( $mesa instanceof Mesa ) {
                 $objetoBDO = ManejoDB::CrearAcceso();
-                $consulta = $objetoBDO->RetornarConsulta( 'UPDATE mesas SET estado = :estadoCancelado WHERE codigoMesa = :codMesa' );
+                $consulta = $objetoBDO->RetornarConsulta( 'UPDATE mesas SET estado = :estadoCancelado fotoMesa = :fotoMesa WHERE codigoMesa = :codMesa' );
                 $consulta->bindValue( ':codMesa', $mesa->codigoMesa );
+                $consulta->bindValue( ':fotoMesa', $mesa->fotoMesa);
                 $consulta->bindValue( ':estadoCancelado', $mesa::CANCELADA );
                 $consulta->execute();
             }
@@ -69,13 +71,13 @@ class Mesa{
         }
     }
 
-    public static function Modificacion($actual, $nEstado = null)
+    public static function Modificacion($codigo, $nuevo )
     {
         try{
             $objetoBDO = ManejoDB::CrearAcceso();
-            $consulta = $objetoBDO->RetornarConsulta( 'UPDATE mesas SET estado=:nEstado WHERE codigoMesa=:codigoMesaActual' );
-            $consulta->bindParam( ':nEstado', $nEstado);
-            $consulta->bindParam( ':codigoMesaActual', $actual->codigoMesa);
+            $consulta = $objetoBDO->RetornarConsulta( 'UPDATE mesas SET estado=:nEstado WHERE codigoMesa=:codigo' );
+            $consulta->bindParam( ':nEstado', $nuevo->estado);
+            $consulta->bindParam( ':codigo', $codigo);
             $consulta->execute();
         } catch(Exception $e){
             echo $e->getMessage();
@@ -97,8 +99,31 @@ class Mesa{
     }
 
     public function AgregarFoto( $fotoMesa ){
-        
+        $this->fotoMesa = null;
+        if( isset($fotoMesa) ){
+            $targetDir = __DIR__ . "/../fotos/mesas/";
+            $targetFile = $targetDir . date("Ymd", time()) .$this->codigoMesa . basename($fotoMesa["name"]);
+            if( !is_dir($targetDir))
+                mkdir( $targetDir, 0777, true);
+            move_uploaded_file( $fotoMesa["tmp_name"], $targetFile );
+            $this->fotoMesa = basename( $targetFile );
+        }
     }
+
+    static function ObtenerPorCodigo( $codigo ){
+        try{
+            $objetoPdo = ManejoDB::CrearAcceso();
+            $consulta = $objetoPdo->RetornarConsulta( "SELECT * FROM mesas WHERE codigoMesa = :codigo" );
+            $consulta->bindParam( ':codigo', $codigo );
+            $consulta->setFetchMode(PDO::FETCH_CLASS, 'Mesa');
+            $consulta->execute();
+            return $consulta->fetch();
+        }catch(Exception $e){
+            echo $e->getMessage();
+        }
+    }
+
+    
 
     public static function ObtenerEstado( $estadoNumero ){
         switch($estadoNumero){
@@ -109,87 +134,11 @@ class Mesa{
             case Mesa::CANCELADA: return "CANCELADA";
         }
     }
-    // public static function Alta( $pedidos, $fotoMesa ){
-    //     try{
-    //         include_once 'Utilidades.php';
 
-    //         $path = dirname(__FILE__)."\\datos";
-    //         $archivo = $path . "\\logmesas.json";
-    //         $ncodigoMesa = Mesa::ObtenercodigoMesaMesa();
-    //         $nMesa = new Mesa( Mesa::CLIENTE_ESPERANDO, $ncodigoMesa, $pedidos, $fotoMesa );
-    //         $arrMesas = Utilidades::AgregarElemento( $archivo, $nMesa );
-    //         return $arrMesas;
-
-    //     }catch(Exception $e){
-    //         echo $e->getMessage();
-    //     }
-    // }
-
-    // public static function Baja( $codigoMesaMesa ){
-    //     try{
-
-    //         $arrMesas = self::ObtenerListado();
-    //         $indice = self::BuscarPorcodigoMesa( $codigoMesaMesa );
-    //         if( $indice ){
-    //             $arrMesas[$indice]->estado = Mesa::CANCELADA;
-    //         }
-            
-    //         self::GuardarListado( $arrMesas );
-
-    //     }catch(Exception $e){
-    //         echo $e->getMessage();
-    //     }
-    // }
-
-    // public static function Modificacion($codCambio, $nEstado = null, $nPedidos = array() )
-    // {
-    //     try{
-    //         $arrMesas = self::ObtenerListado();
-    //         $indice = self::BuscarPorcodigoMesa($codCambio);
-    //         if( $indice ){
-    //             $arrMesas[$indice]->estado = $nEstado;
-    //             $arrMesas[$indice]->pedidos = $nPedidos;
-    //         }
-    //         self::GuardarListado( $arrMesas );
-    //     } catch(Exception $e){
-    //         echo $e->getMessage();
-    //     }
-    // }
-
-    // public static function BuscarPorcodigoMesa( $codigoMesaMesa ){
-    //     $arrMesas = self::ObtenerListado();
-    //     for( $i = 0; $i < count($arrMesas); $i++ ){
-    //         if( $arrMesas[$i]->codigoMesa == $codigoMesaMesa ){
-    //             return $i;
-    //         }
-    //     }
-    //     return false;
-    // }
-
-    // public static function ObtenerListado(){
-    //     include_once 'Utilidades.php';
-
-    //     $path = dirname(__FILE__)."\\datos";
-    //     $archivo = $path . "\\logmesas.json";
-
-    //     return Utilidades::LeerJson( $archivo );
-    // }
-
-    // private static function GuardarListado( $arrMesas ){
-    //     include_once 'Utilidades.php';
-
-    //     $path = dirname(__FILE__)."\\datos";
-    //     $archivo = $path . "\\logmesas.json";
-
-    //     return Utilidades::SubirJson($archivo, $arrMesas);
-    // }
-
-    // private static function ObtenercodigoMesaMesa(){
-    //     include_once 'Utilidades.php';
-    //     $ultiCod = ( Utilidades::ObtenerDeValores( 'mesasUCod' ) + 1);
-    //     Utilidades::ModificarEnValores( 'mesasUCod', $ultiCod );
-    //     return $ultiCod;
-    // }
+    public function setEstado( $estado ){
+        $this->estado = $estado;
+        self::Modificacion( $this->codigoMesa, $this);
+    }
 
     public function __toString()
     {

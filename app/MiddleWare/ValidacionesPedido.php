@@ -1,24 +1,30 @@
 <?php
 
+use Psr\Http\Message\ServerRequestInterface as Request;
+use Psr\Http\Server\RequestHandlerInterface as Handler;
 use Slim\Psr7\Response as ResponseMW;
+use Slim\Routing\RouteContext;
+
+include_once __DIR__ . "/../Clases/DatosUsuarioLogueado.php";
+include_once __DIR__ . "/../Clases/ManejoDB.php";
 
 class ValidacionesPedido{
-    public static function ValidarMesa( $request, $handler ){
-        include_once __DIR__ . "/../Clases/ManejoDB.php";
+    public static function ValidarMesa( Request $request, Handler $handler ){
         try{
-            $codigoRequest = $request->getParsedBody()["codigoMesa"];
+            $routeContext = RouteContext::fromRequest( $request );
+            $route = $routeContext->getRoute();
+            $codigoMesa = $route->getArgument("codigomesa");
+
             $response = new ResponseMW();
             $objetoPdo = ManejoDB::CrearAcceso();
-            $consulta = $objetoPdo->RetornarConsulta( "SELECT codigoMesa FROM mesas" );
+            $consulta = $objetoPdo->RetornarConsulta( "SELECT * FROM mesas WHERE codigoMesa = '".$codigoMesa."'" );
             $consulta->execute();
-            $arrayCodigos = $consulta->fetchAll(PDO::FETCH_COLUMN);
 
-            $response->getBody()->write( json_encode(['mensaje' => 'Codigo de mesa no existe']) );
-            foreach( $arrayCodigos as $codigo ){
-                if( $codigoRequest == $codigo ){
-                    $response = $handler->handle( $request );
-                    break;
-                }
+
+            if( $consulta->fetch() ){
+                $response = $handler->handle( $request );
+            } else {
+                $response->getBody()->write( json_encode(['mensaje' => 'Codigo de mesa no existe']) ); 
             }
             return $response;
 
@@ -29,30 +35,25 @@ class ValidacionesPedido{
         }
     }
 
-    public static function ValidarDatos( $request, $handler ) {
+    public static function ValidarDatos( Request $request, Handler $handler ) {
         include_once __DIR__ . "/../Clases/ManejoDB.php";
+        include_once __DIR__ . "/../Clases/Producto.php";
+
         try{
             $response = new ResponseMW();
             $cuerpoRequest = $request->getParsedBody();
-            $arrayProductosEncargo = $cuerpoRequest['encargo'];
-            
-            if( $cuerpoRequest['minutosEstimados'] < 1 ){
-                $response->getBody()->write( json_encode(['mensaje' => 'Tiempo no valido']) );
-            } else {
-                $objetoPdo = ManejoDB::CrearAcceso();
-                $consulta = $objetoPdo->RetornarConsulta( "SELECT nombre FROM productos" );
-                $consulta->execute();
-                $arrayProductos = $consulta->fetchAll(PDO::FETCH_COLUMN);
-                for( $i = 0; $i < count($arrayProductosEncargo); $i++ ){
-                    $indx = array_search($arrayProductosEncargo[$i], $arrayProductos );
-                    if( $indx == false ){
-                        $response->getBody()->write( json_encode(['mensaje' => 'No existe el producto '.$cuerpoRequest['encargo'][$i]]) );
-                        break;
-                    } 
+            $arrayProductosEncargo = $cuerpoRequest['encargos'];
+            $todosLosProductosExisten = true;
+
+            foreach( $arrayProductosEncargo as $producto ){
+                if( !Producto::Existe($producto) ){
+                    $todosLosProductosExisten = false;
+                    $response->getBody()->write( json_encode(['mensaje' => 'No existe el producto '.$producto]));
+                    break;
                 }
-                if( $indx ){
-                    $response = $handler->handle( $request );
-                }
+            }
+            if( $todosLosProductosExisten ){
+                $response = $handler->handle($request);
             }
     
     
@@ -63,4 +64,6 @@ class ValidacionesPedido{
             return $response;
         }
     }
+
+    
 }

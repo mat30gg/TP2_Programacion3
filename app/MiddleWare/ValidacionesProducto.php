@@ -5,38 +5,41 @@ use Slim\Psr7\Response as ResponseMW;
 class ValidacionesProducto{
 
     public static function ValidarDatos( $request, $handler ) {
+        include_once __DIR__ . "/../Clases/Puesto.php";
+
         $response = new ResponseMW();
         $cuerpoRequest = $request->getParsedBody();
 
-        switch( $cuerpoRequest['tipo']){
-            case 'trago':
-            case 'vino':
-            case 'cocina':
-            case 'cerveza':
-            case 'postre':
+        if( Puesto::IdPuestoPorNombre( $cuerpoRequest['puestoasignado']) == -1 ){
+            $response->getBody()->write( json_encode(['mensaje' => 'Ingrese un puesto valido']) );
+        }else{
+            if( $cuerpoRequest['precio'] < 0 || !is_numeric($cuerpoRequest['precio']) ){
+                $response->getBody()->write( json_encode(['mensaje' => 'Ingrese un precio valido']));
+            }else{
                 $response = $handler->handle( $request );
-                break;
-            default:
-                $response->getBody()->write( json_encode(['mensaje' => 'Ingrese un tipo valido']) );
-                break;
+            }
         }
 
         return $response->withHeader('Content-Type', 'application/json');
     }
 
-    public static function ValidarIngresoDatos( $request, $handler ) {
+    public static function ValidarQueNoExiste( $request, $handler ){
+        include_once __DIR__ . "/../Clases/ManejoDB.php";
+        $cuerpoSolicitud = $request->getParsedBody();
         
         $response = new ResponseMW();
-        $cuerpoRequest = $request->getParsedBody();
-
-        if( trim($cuerpoRequest['nombre']) == false ){
-            $response->getBody()->write( json_encode(['mensaje' => 'Ingrese un nombre del producto']) );
-        } elseif( trim($cuerpoRequest['tipo']) == false ) {
-            $response->getBody()->write( json_encode(['mensaje' => 'Ingrese un tipo de producto']) );
+        $objetoPdo = ManejoDB::CrearAcceso();
+        $consulta = $objetoPdo->RetornarConsulta( 'SELECT * FROM productos WHERE nombre = :nombre' );
+        $consulta->bindValue(':nombre', $cuerpoSolicitud['nombre']);
+        $consulta->execute();
+        $resultado = $consulta->fetchAll();
+        
+        if( empty($resultado) ){
+            $response = $handler->handle($request);
         } else {
-            $response = $handler->handle( $request );
+            $response->getBody()->write( json_encode(['mensaje' => 'El producto ya esta registrado']));
         }
 
-        return $response->withHeader('Content-Type', 'application/json');
+        return $response;
     }
 }

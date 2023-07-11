@@ -2,10 +2,14 @@
 
 use GuzzleHttp\Psr7\Response;
 use Slim\Psr7\Response as ResponseMW;
+use Psr\Http\Message\ServerRequestInterface as Request;
+use Psr\Http\Server\RequestHandlerInterface as Handler;
+
+include_once "Clases/ManejoDB.php";
 
 class ValidacionesLogueo{
 
-    public static function ValidarLogin( $request, $handler ){
+    public static function ValidarLogin( Request $request, Handler $handler ){
         $response = new ResponseMW();
         $cuerpoSolicitud = $request->getParsedBody();
 
@@ -21,25 +25,28 @@ class ValidacionesLogueo{
         return $response;
     }
 
-    public static function ValidarCredenciales( $request, $handler ){
-        include_once "../Clases/ManejoDB.php";
+    
+
+    public static function ValidarCredenciales( Request $request, Handler $handler ){
+        include_once "Clases/Usuario.php";
 
         $response = new ResponseMW();
-        $objetoPdo = ManejoDB::CrearAcceso();
-        $consulta = $objetoPdo->RetornarConsulta( "SELECT * FROM usuarios" );
-        $usuarios = $consulta->fetchAll( PDO::FETCH_OBJ );
+        $usuarios = Usuario::ObtenerListado();
+        $requestBody = $request->getParsedBody();
         foreach( $usuarios as $usr ){
-            if( $usr->email == $email){
-                if( $usr->clave = $clave ){
+            if( $usr->email == $requestBody['email'] ){
+                if( $usr->clave == $requestBody['clave'] ){
                     $response = $handler->handle( $request );
+                    $responseBody = json_encode(['mensaje' => 'Credenciales validas']);
                 } else {
-                    $response->getBody()->write( json_encode(['mensaje' => 'Contraseña incorrecta']));
+                    $responseBody = json_encode(['mensaje' => 'Clave incorrecta']);
                 }
                 break;
             } else {
-                $response->getBody()->write( json_encode(['mensaje' => 'Email no registrado']));
+                $responseBody = json_encode(['mensaje' => 'Email no registrado']);
             }
         }
+        $response->getBody()->write( $responseBody );
         return $response;
     }
 }
