@@ -201,8 +201,9 @@ class Pedido{
         if( $this->estado != Pedido::PENDIENTE ){
             $stringPedido .= " HORA ESTIMADA DE PREPARACION: " . date_create($this->horaEstimada)->format("H:i:s") . "\n";
             $tiempoRestante = date_diff(  date_create(), date_create($this->horaEstimada), false);
-            $stringPedido .= "Tiempo restante: [". $tiempoRestante->format("%r%H:%I:%S") . "]". "\n";
-            if( $this->estado == Pedido::SERVIDO ){
+            if( $this->estado != Pedido::SERVIDO ){
+                $stringPedido .= "Tiempo restante: [". $tiempoRestante->format("%r%H:%I:%S") . "]". "\n";
+            }else{
                 $stringPedido .= " HORA DE ENTREGA: " . date_create($this->horaFinal)->format("H:i:s");
             }
         }
@@ -213,7 +214,7 @@ class Pedido{
     static function PedidosTardios(){
         try{
             $objetoPdo = ManejoDB::CrearAcceso();
-            $consulta = $objetoPdo->RetornarConsulta( 'SELECT * FROM pedidos WHERE pedidos.horaFinal < NOW()' );
+            $consulta = $objetoPdo->RetornarConsulta( 'SELECT * FROM pedidos WHERE pedidos.horaFinal > pedidos.horaEstimada' );
             $consulta->execute();
             $arrayReturn = $consulta->fetchAll( PDO::FETCH_CLASS, 'Pedido' );
             return $arrayReturn;

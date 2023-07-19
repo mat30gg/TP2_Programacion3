@@ -200,8 +200,8 @@ $app->group("/menusocio", function(RouteCollectorProxy $group) {
                     $nObj = new Producto( $elemento[0] ,$elemento[1] ,$elemento[2] ,$elemento[3] ,$elemento[4] );
                     Producto::Alta($nObj);
                 }elseif( $tDato == "empleados" ){
-                    $nObj = new Empleado( $elemento[0] ,$elemento[1] ,$elemento[2] ,$elemento[3] ,$elemento[4], $elemento[5] );
-                    Empleado::Alta( $nObj );
+                    // $nObj = new Empleado( $elemento[0] ,$elemento[1] ,$elemento[2] ,$elemento[3] ,$elemento[4], $elemento[5] );
+                    // Empleado::Alta( $nObj->nombre, $nObj->email, $nObj->id_puesto, $nObj->fechaRegistro );
                 }
                 $arrayValores[] = $nObj;
             }
@@ -270,7 +270,7 @@ $app->group("/menusocio", function(RouteCollectorProxy $group) {
         include_once "Clases/Mesa.php";
         include_once "Clases/Estadisticas.php";
 
-        $mesaMasUsada = Logs::MesaMasUsada();
+        $mesaMasUsada = Stats::MesaMasUsada();
         $response->getBody()->write( "La mesa mas usada:\n" );
         $response->getBody()->write( json_encode($mesaMasUsada) );
         return $response;
@@ -294,9 +294,7 @@ $app->group("/menusocio", function(RouteCollectorProxy $group) {
         $pdf = new TCPDF();
         $pdf->AddPage();
         $pdf->Image( '@'.$img, 0, 0, 200);
-        //echo $dirArchivo;
         $pdf->Output("logoempresa.pdf", "I");
-        //return $response;
         return $response;
 
     });
@@ -647,7 +645,18 @@ $app->get( "/verestado/{codigomesa}/{numeropedido}", function(Request $request, 
     $pedido = Pedido::ObtenerPorNumPed($numPed);
     $response->getBody()->write( $pedido->__toString() );
     return $response;
+})
+->add( function (Request $request, $handler){ 
+    $routeContext = RouteContext::fromRequest( $request );
+    $route = $routeContext->getRoute();
+    $numPed = $route->getArgument("numeropedido");
+    $codigoMesa = $route->getArgument("codigomesa");
+    $request = $request->withAddedHeader( 'codigoMesa', $codigoMesa );
+    $request = $request->withAddedHeader( 'numPed', $numPed );
+    $response = $handler->handle( $request );
+    return $response;
 });
+
 
 $app->post( "/encuesta/{codigomesa}/{numeropedido}", function(Request $request, Response $response) {
     include_once "Clases/Encuesta.php";

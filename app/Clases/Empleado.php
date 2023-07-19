@@ -91,7 +91,7 @@ include_once "Puesto.php";
                     $objetoBDO = ManejoDB::CrearAcceso();
                     $consulta = $objetoBDO->RetornarConsulta( 'UPDATE empleados SET nombre=:nNombre,puesto=:nPuesto WHERE id_emplado=:idActual' );
                     $consulta->bindParam( ':nNombre', $reemplazo->nombre);
-                    $consulta->bindParam( ':nPuesto', $reemplazo->puesto);
+                    $consulta->bindParam( ':nPuesto', $reemplazo->id_puesto);
                     $consulta->bindParam( ':idActual', $actual->id);
                     $consulta->execute();
                 }

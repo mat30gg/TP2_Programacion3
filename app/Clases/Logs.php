@@ -66,19 +66,6 @@ class Logs{
         }
     }
 
-    static function MesaMasUsada( ){
-        try{
-            $objetoPdo = ManejoDB::CrearAcceso();
-            $query = "SELECT mesas.codigoMesa, mesas.estado, mesas.fotoMesa , COUNT(*) AS usos_totales FROM mesas JOIN pedidos ON pedidos.codigoMesa = mesas.codigoMesa LIMIT 1";
-            $consulta = $objetoPdo->RetornarConsulta( $query );
-            $consulta->setFetchMode( PDO::FETCH_OBJ);
-            $consulta->execute();
-            return $consulta->fetch();
-        }catch(Exception $e){
-            echo $e->getMessage();
-        }
-    }
-
     static function MesasOrdenadasPorUso( $ascendente ,$desde = null, $hasta = null ){
         try{
             $paramDesde = $desde ?? date_format( date_create("-100 years"), "Y-m-d" );
@@ -87,13 +74,14 @@ class Logs{
             if( $ascendente )
                 $orden = "ASC";
             
-            $query = "SELECT puestos.nombre, COUNT(*) AS cantidad_usos 
-            FROM ((mesas JOIN pedidos ON mesas.codigoMesa = pedidos.codigoMesa) 
-            JOIN logs ON logs.numPed = pedidos.numPed) ".
+            $query = "SELECT mesas.codigoMesa, mesas.estado, mesas.fotoMesa, COUNT(mesas.codigoMesa) AS cantidad_usos 
+            FROM ((mesas JOIN pedidos ON mesas.codigoMesa = pedidos.codigoMesa) ".
+            "JOIN `logs` ON `logs`.`numPed` = pedidos.numPed) ".
             "WHERE `logs`.`fecha_accion` > :fecha_desde ".
             "AND `logs`.`fecha_accion` <= :fecha_hasta ".
-            "GROUP BY puestos.nombre ".
-            "ORDER BY puestos.nombre ".$orden;
+            "AND `logs`.`accion` = 'Tomar pedido' ".
+            "GROUP BY mesas.codigoMesa ".
+            "ORDER BY cantidad_usos ".$orden;
 
             $objetoPdo = ManejoDB::CrearAcceso();
             $consulta = $objetoPdo->RetornarConsulta( $query );
@@ -259,6 +247,7 @@ class Logs{
             JOIN `logs` ON `logs`.numPed = pedidos.numPed ".
             "WHERE `logs`.`fecha_accion` > :fecha_desde ".
             "AND `logs`.`fecha_accion` <= :fecha_hasta ".
+            "AND `logs`.`accion` = 'Tomar pedido' ".
             "GROUP BY mesas.codigoMesa ".
             "ORDER BY precio_facturado ".$orden;
             
@@ -285,6 +274,7 @@ class Logs{
             JOIN `logs` ON `logs`.numPed = pedidos.numPed ".
             "WHERE `logs`.`fecha_accion` > :fecha_desde ".
             "AND `logs`.`fecha_accion` <= :fecha_hasta ".
+            "AND `logs`.`accion` = 'Tomar pedido' ".
             "AND mesas.codigoMesa = :codigoMesa ";
             
             $consulta = $objetoPdo->RetornarConsulta( $query );
